@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rubik Solver 3x3 - Penyelesaian Mudah</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Custom touch & visual refinements for Rubik stickers and canvas */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .sticker-btn {
+      transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+      user-select: none;
+    }
+
+    .sticker-btn:active:not(:disabled) {
+      transform: scale(0.91);
+    }
+
+    .cube-canvas-container {
+      touch-action: none; /* Enables smooth finger rotation on mobile */
+    }
+
+    /* Subtle checkerboard pattern for empty/unfilled stickers */
+    .sticker-empty {
+      background-color: #e2e8f0;
+      background-image: linear-gradient(45deg, #cbd5e1 25%, transparent 25%),
+        linear-gradient(-45deg, #cbd5e1 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #cbd5e1 75%),
+        linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+
+  <!-- Top Navigation / App Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-3">
+        <!-- Mini 3x3 Rubik Icon SVG -->
+        <div class="w-10 h-10 rounded-xl bg-slate-900 p-1.5 grid grid-cols-3 gap-0.5 shadow-sm shrink-0">
+          <span class="bg-red-500 rounded-[2px]"></span>
+          <span class="bg-yellow-400 rounded-[2px]"></span>
+          <span class="bg-blue-500 rounded-[2px]"></span>
+          <span class="bg-green-500 rounded-[2px]"></span>
+          <span class="bg-white rounded-[2px]"></span>
+          <span class="bg-orange-500 rounded-[2px]"></span>
+          <span class="bg-blue-500 rounded-[2px]"></span>
+          <span class="bg-red-500 rounded-[2px]"></span>
+          <span class="bg-green-500 rounded-[2px]"></span>
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 leading-tight">
+            Rubik Solver 3x3
+          </h1>
+          <p class="text-xs text-slate-500 hidden sm:block">
+            Input warna satu per satu & dapatkan panduan 3D langkah demi langkah
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Utility Buttons -->
+      <div class="flex items-center gap-2">
+        <button
+          id="btn-demo-scramble"
+          type="button"
+          class="px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 active:scale-95 transition flex items-center gap-1.5"
+          title="Isi contoh acak untuk mencoba aplikasi"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Contoh Acak</span>
+        </button>
+        <button
+          id="btn-reset-colors"
+          type="button"
+          class="px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition flex items-center gap-1.5"
+          title="Kosongkan semua kotak warna"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span>Reset</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-5 space-y-5">
+
+    <!-- ========================================================= -->
+    <!-- SECTION 1: COLOR INPUT SCREEN (3D CUBE BOX)               -->
+    <!-- ========================================================= -->
+    <section id="section-input" class="space-y-4">
+
+      <!-- Orientation Guide Banner -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Cara Mengisi Warna pada Kotak Rubik 3D:</h2>
+            <p class="text-xs sm:text-sm text-slate-600 mt-0.5 leading-relaxed">
+              Pilih warna di palet bawah, lalu <span class="font-bold text-indigo-700">ketuk langsung kotak stiker pada kubus 3D</span>. Geser layar atau gunakan tombol sisi untuk memutar kubus 3D.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Camera Face Snap Buttons -->
+      <div id="face-tabs-container" class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Main 3D Input Editor Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-5">
+
+        <!-- Interactive 3D Input Stage -->
+        <div class="relative bg-gradient-to-b from-slate-100 to-slate-200/80 rounded-2xl border border-slate-200 overflow-hidden cube-canvas-container">
+          <canvas id="input-3d-canvas" class="w-full h-80 sm:h-96 block cursor-pointer"></canvas>
+
+          <!-- Top-left instruction pill -->
+          <div class="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-xl text-[11px] font-semibold text-slate-700 border border-slate-200/80 pointer-events-none shadow-sm">
+            Ketuk kotak untuk mewarnai &bull; Geser untuk memutar 3D
+          </div>
+
+          <!-- Top-right quick 180° flip button to reach back/bottom easily -->
+          <button
+            id="btn-flip-input-cube"
+            type="button"
+            class="absolute top-3 right-3 bg-white/95 hover:bg-white backdrop-blur-sm px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-700 border border-slate-200 shadow-sm active:scale-95 transition flex items-center gap-1"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Balik Sisi</span>
+          </button>
+
+          <!-- Bottom Legend for Centers -->
+          <div class="absolute bottom-3 left-3 right-3 flex justify-center pointer-events-none">
+            <span class="bg-slate-900/75 backdrop-blur-sm text-white px-3 py-1 rounded-full text-[11px] font-medium">
+              Kotak bertanda titik adalah pusat warna tiap sisi (terkunci)
+            </span>
+          </div>
+        </div>
+
+        <!-- Divider -->
+        <hr class="border-slate-200" />
+
+        <!-- Color Palette Picker -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs sm:text-sm font-bold text-slate-700">
+              1. Pilih Warna, lalu Ketuk Kotak pada Kubus 3D di Atas:
+            </span>
+            <span id="total-filled-counter" class="text-xs font-semibold text-slate-500">
+              Terisi: 6 / 54 kotak
+            </span>
+          </div>
+
+          <div id="color-palette" class="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+            <!-- 6 Color Palette Buttons injected by JS -->
+          </div>
+        </div>
+
+        <!-- Validation / Feedback Message Box (Replaces alert()) -->
+        <div
+          id="validation-box"
+          class="hidden rounded-xl p-3.5 text-sm font-medium border flex items-start gap-2.5"
+          role="alert"
+        >
+          <svg id="validation-icon" class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div id="validation-text" class="flex-1 leading-relaxed"></div>
+        </div>
+
+        <!-- Primary Solve Action Button -->
+        <button
+          id="btn-solve-cube"
+          type="button"
+          class="w-full py-3.5 px-6 rounded-2xl font-extrabold text-base sm:text-lg text-white bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 shadow-md hover:shadow-lg active:scale-[0.99] transition flex items-center justify-center gap-2"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span>Selesaikan Rubik Sekarang</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- SECTION 2: 3D STEP-BY-STEP SOLUTION PLAYER                -->
+    <!-- ========================================================= -->
+    <section id="section-solution" class="hidden space-y-4">
+
+      <!-- Top Solution Header -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+            ✓ Solusi Ditemukan
+          </span>
+          <h2 id="solution-summary-title" class="text-lg sm:text-xl font-extrabold text-slate-900 mt-1">
+            Selesai dalam 0 Langkah
+          </h2>
+        </div>
+
+        <button
+          id="btn-back-to-edit"
+          type="button"
+          class="px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95 transition flex items-center gap-1.5"
+        >
+          <span>← Ubah Warna Rubik</span>
+        </button>
+      </div>
+
+      <!-- Main 3D Visualization & Step Instruction Card -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-sm space-y-5">
+
+        <!-- Progress Bar -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs font-bold text-slate-600">
+            <span id="step-progress-label">Langkah 0 dari 0</span>
+            <span id="step-percent-label">0%</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div id="step-progress-bar" class="h-full bg-indigo-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- 3D Interactive Canvas Stage -->
+        <div class="relative bg-gradient-to-b from-slate-100 to-slate-200/70 rounded-2xl border border-slate-200 overflow-hidden cube-canvas-container">
+          <canvas id="cube-3d-canvas" class="w-full h-72 sm:h-80 block cursor-grab active:cursor-grabbing"></canvas>
+
+          <!-- Overlay Helper Controls -->
+          <div class="absolute top-3 left-3 bg-white/85 backdrop-blur-sm px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 border border-slate-200/80 pointer-events-none">
+            Geser layar untuk memutar sudut pandang 3D
+          </div>
+          <button
+            id="btn-reset-camera"
+            type="button"
+            class="absolute top-3 right-3 bg-white/90 hover:bg-white backdrop-blur-sm px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-700 border border-slate-200 shadow-sm active:scale-95 transition"
+          >
+            Reset Sudut
+          </button>
+        </div>
+
+        <!-- Current Move Plain-Indonesian Instruction Box -->
+        <div id="current-move-card" class="rounded-2xl bg-indigo-50/80 border border-indigo-100 p-4 flex items-center gap-4">
+          <div
+            id="move-notation-badge"
+            class="w-16 h-16 rounded-2xl bg-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shrink-0 shadow-sm"
+          >
+            Mulai
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="move-face-tag" class="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200">
+                Posisi Awal
+              </span>
+              <span id="move-dir-tag" class="text-xs font-bold text-indigo-700">
+                Siap Dimulai
+              </span>
+            </div>
+            <p id="move-instruction-text" class="text-sm sm:text-base font-bold text-slate-900 mt-1 leading-snug">
+              Pegang Rubik dengan Pusat Putih di ATAS dan Hijau di DEPAN, lalu tekan "Maju" atau "Putar".
+            </p>
+          </div>
+        </div>
+
+        <!-- Playback Buttons -->
+        <div class="grid grid-cols-4 gap-2 sm:gap-3">
+          <button
+            id="btn-step-first"
+            type="button"
+            class="py-3 px-2 rounded-xl font-bold text-xs sm:text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 transition flex flex-col sm:flex-row items-center justify-center gap-1"
+          >
+            <span>⏮</span>
+            <span>Awal</span>
+          </button>
+          <button
+            id="btn-step-prev"
+            type="button"
+            class="py-3 px-2 rounded-xl font-bold text-xs sm:text-sm bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 transition flex flex-col sm:flex-row items-center justify-center gap-1"
+          >
+            <span>◀</span>
+            <span>Mundur</span>
+          </button>
+          <button
+            id="btn-step-play"
+            type="button"
+            class="py-3 px-2 rounded-xl font-bold text-xs sm:text-sm bg-emerald-600 text-white hover:bg-emerald-700 transition flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm"
+          >
+            <span id="play-btn-icon">▶</span>
+            <span id="play-btn-label">Putar</span>
+          </button>
+          <button
+            id="btn-step-next"
+            type="button"
+            class="py-3 px-2 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm"
+          >
+            <span>Maju</span>
+            <span>▶</span>
+          </button>
+        </div>
+
+        <!-- Speed Control -->
+        <div class="flex items-center justify-between bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200/80 text-xs">
+          <span class="font-semibold text-slate-600">Kecepatan Animasi:</span>
+          <div class="flex items-center gap-1.5">
+            <button type="button" data-speed="1400" class="speed-btn px-2.5 py-1 rounded-lg font-bold bg-white text-slate-600 border border-slate-200">Lambat</button>
+            <button type="button" data-speed="850" class="speed-btn px-2.5 py-1 rounded-lg font-bold bg-indigo-600 text-white">Normal</button>
+            <button type="button" data-speed="450" class="speed-btn px-2.5 py-1 rounded-lg font-bold bg-white text-slate-600 border border-slate-200">Cepat</button>
+          </div>
+        </div>
+
+        <!-- All Moves Sequence List -->
+        <div class="space-y-2">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Urutan Semua Langkah (Ketuk untuk melompat):
+          </h3>
+          <div id="moves-pill-list" class="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto p-1">
+            <!-- Step pills injected by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="max-w-4xl w-full mx-auto px-4 py-4 text-center text-xs text-slate-400">
+    Rubik Solver 3x3 &bull; Notasi Standar Internasional (U, D, L, R, F, B)
+  </footer>
+
+  <!-- ========================================================= -->
+  <!-- JAVASCRIPT: RUBIK ENGINE, THISTLETHWAITE SOLVER & 3D VIEW -->
+  <!-- ========================================================= -->
+  <script>
+    (function () {
+      'use strict';
+
+      /* =========================================================================
+       * 1. COLOR & FACE CONFIGURATION (STANDARD WESTERN COLOR SCHEME)
+       * ========================================================================= */
+      const COLORS = {
+        W: { code: 'W', name: 'Putih',  hex: '#FFFFFF', border: '#CBD5E1', text: '#0F172A' },
+        Y: { code: 'Y', name: 'Kuning', hex: '#FACC15', border: '#EAB308', text: '#0F172A' },
+        G: { code: 'G', name: 'Hijau',  hex: '#22C55E', border: '#16A34A', text: '#FFFFFF' },
+        B: { code: 'B', name: 'Biru',   hex: '#3B82F6', border: '#2563EB', text: '#FFFFFF' },
+        R: { code: 'R', name: 'Merah',  hex: '#EF4444', border: '#DC2626', text: '#FFFFFF' },
+        O: { code: 'O', name: 'Oranye', hex: '#F97316', border: '#EA580C', text: '#FFFFFF' },
+      };
+
+      const COLOR_ORDER = ['W', 'Y', 'G', 'B', 'R', 'O'];
+
+      // Face order in our 54-sticker array:
+      // U: 0..8, R: 9..17, F: 18..26, D: 27..35, L: 36..44, B: 45..53
+      const FACES = [
+        {
+          id: 'U',
+          offset: 0,
+          centerColor: 'W',
+          shortName: 'Atas',
+          title: 'Sisi ATAS (Pusat Putih)',
+          hint: 'Miringkan bagian atas Rubik ke arah Anda (Biru di atas, Hijau di bawah).',
+          neighbors: { top: 'B', bottom: 'F', left: 'L', right: 'R' },
+        },
+        {
+          id: 'F',
+          offset: 18,
+          centerColor: 'G',
+          shortName: 'Depan',
+          title: 'Sisi DEPAN (Pusat Hijau)',
+          hint: 'Hadapkan sisi Hijau lurus ke depan (Putih di atas, Kuning di bawah).',
+          neighbors: { top: 'U', bottom: 'D', left: 'L', right: 'R' },
+        },
+        {
+          id: 'R',
+          offset: 9,
+          centerColor: 'R',
+          shortName: 'Kanan',
+          title: 'Sisi KANAN (Pusat Merah)',
+          hint: 'Putar kubus ke kiri sehingga sisi Merah menghadap ke depan (Putih di atas).',
+          neighbors: { top: 'U', bottom: 'D', left: 'F', right: 'B' },
+        },
+        {
+          id: 'B',
+          offset: 45,
+          centerColor: 'B',
+          shortName: 'Belakang',
+          title: 'Sisi BELAKANG (Pusat Biru)',
+          hint: 'Lihat sisi belakang (Biru) dengan Putih tetap di atas dan Kuning di bawah.',
+          neighbors: { top: 'U', bottom: 'D', left: 'R', right: 'L' },
+        },
+        {
+          id: 'L',
+          offset: 36,
+          centerColor: 'O',
+          shortName: 'Kiri',
+          title: 'Sisi KIRI (Pusat Oranye)',
+          hint: 'Putar kubus ke kanan sehingga sisi Oranye menghadap ke depan (Putih di atas).',
+          neighbors: { top: 'U', bottom: 'D', left: 'B', right: 'F' },
+        },
+        {
+          id: 'D',
+          offset: 27,
+          centerColor: 'Y',
+          shortName: 'Bawah',
+          title: 'Sisi BAWAH (Pusat Kuning)',
+          hint: 'Miringkan bagian bawah Rubik ke arah Anda (Hijau di atas, Biru di bawah).',
+          neighbors: { top: 'F', bottom: 'B', left: 'L', right: 'R' },
+        },
+      ];
+
+      const FACE_BY_ID = Object.fromEntries(FACES.map((f) => [f.id, f]));
+
+      // Solved 54-sticker reference array
+      const SOLVED_FACELETS = [
+        ...Array(9).fill('W'), // U (0..8)
+        ...Array(9).fill('R'), // R (9..17)
+        ...Array(9).fill('G'), // F (18..26)
+        ...Array(9).fill('Y'), // D (27..35)
+        ...Array(9).fill('O'), // L (36..44)
+        ...Array(9).fill('B'), // B (45..53)
+      ];
+
+      /* =========================================================================
+       * 2. FACELET ROTATION & CUBIE REPRESENTATION
+       * ========================================================================= */
+      // Rotate a 3x3 face clockwise on a 54-element array
+      function rotateFaceClockwise(arr, offset) {
+        const copy = arr.slice();
+        const map = [6, 3, 0, 7, 4, 1, 8, 5, 2];
+        for (let i = 0; i < 9; i++) {
+          arr[offset + i] = copy[offset + map[i]];
+        }
+      }
+
+      // Apply a single clockwise quarter-turn ('U', 'R', 'F', 'D', 'L', 'B') to a 54-sticker array
+      function applyFaceTurnToFacelets(facelets, face) {
+        const f = facelets.slice();
+        const U = 0, R = 9, F = 18, D = 27, L = 36, B = 45;
+
+        const cycle4 = (a, b, c, d) => {
+          for (let i = 0; i < 3; i++) {
+            const tmp = f[d[i]];
+            f[d[i]] = f[c[i]];
+            f[c[i]] = f[b[i]];
+            f[b[i]] = f[a[i]];
+            f[a[i]] = tmp;
+          }
+        };
+
+        if (face === 'U') {
+          rotateFaceClockwise(f, U);
+          cycle4([F + 0, F + 1, F + 2], [L + 0, L + 1, L + 2], [B + 0, B + 1, B + 2], [R + 0, R + 1, R + 2]);
+        } else if (face === 'D') {
+          rotateFaceClockwise(f, D);
+          cycle4([F + 6, F + 7, F + 8], [R + 6, R + 7, R + 8], [B + 6, B + 7, B + 8], [L + 6, L + 7, L + 8]);
+        } else if (face === 'F') {
+          rotateFaceClockwise(f, F);
+          cycle4([U + 6, U + 7, U + 8], [R + 0, R + 3, R + 6], [D + 2, D + 1, D + 0], [L + 8, L + 5, L + 2]);
+        } else if (face === 'B') {
+          rotateFaceClockwise(f, B);
+          cycle4([U + 2, U + 1, U + 0], [L + 0, L + 3, L + 6], [D + 6, D + 7, D + 8], [R + 8, R + 5, R + 2]);
+        } else if (face === 'R') {
+          rotateFaceClockwise(f, R);
+          cycle4([U + 8, U + 5, U + 2], [B + 0, B + 3, B + 6], [D + 8, D + 5, D + 2], [F + 8, F + 5, F + 2]);
+        } else if (face === 'L') {
+          rotateFaceClockwise(f, L);
+          cycle4([U + 0, U + 3, U + 6], [F + 0, F + 3, F + 6], [D + 0, D + 3, D + 6], [B + 8, B + 5, B + 2]);
+        }
+        return f;
+      }
+
+      // Apply notation move ('U', "U'", 'U2', etc.) to 54-sticker array
+      function applyNotationToFacelets(facelets, moveStr) {
+        const face = moveStr[0];
+        const suffix = moveStr.slice(1);
+        const turns = suffix === '2' ? 2 : suffix === "'" ? 3 : 1;
+        let res = facelets;
+        for (let t = 0; t < turns; t++) {
+          res = applyFaceTurnToFacelets(res, face);
+        }
+        return res;
+      }
+
+      // Corner & Edge mappings between 54-sticker net and 20-cubie coordinates
+      const CORNER_FACELETS = [
+        [8, 9, 20],   // 0: URF
+        [6, 18, 38],  // 1: UFL
+        [0, 36, 47],  // 2: ULB
+        [2, 45, 11],  // 3: UBR
+        [29, 26, 15], // 4: DFR
+        [27, 44, 24], // 5: DLF
+        [33, 53, 42], // 6: DBL
+        [35, 17, 51], // 7: DRB
+      ];
+
+      const CORNER_COLORS = [
+        ['W', 'R', 'G'],
+        ['W', 'G', 'O'],
+        ['W', 'O', 'B'],
+        ['W', 'B', 'R'],
+        ['Y', 'G', 'R'],
+        ['Y', 'O', 'G'],
+        ['Y', 'B', 'O'],
+        ['Y', 'R', 'B'],
+      ];
+
+      const EDGE_FACELETS = [
+        [5, 10],  // 0: UR
+        [7, 19],  // 1: UF
+        [3, 37],  // 2: UL
+        [1, 46],  // 3: UB
+        [32, 16], // 4: DR
+        [28, 25], // 5: DF
+        [30, 43], // 6: DL
+        [34, 52], // 7: DB
+        [23, 12], // 8: FR
+        [21, 41], // 9: FL
+        [50, 39], // 10: BL
+        [48, 14], // 11: BR
+      ];
+
+      const EDGE_COLORS = [
+        ['W', 'R'],
+        ['W', 'G'],
+        ['W', 'O'],
+        ['W', 'B'],
+        ['Y', 'R'],
+        ['Y', 'G'],
+        ['Y', 'O'],
+        ['Y', 'B'],
+        ['G', 'R'],
+        ['G', 'O'],
+        ['B', 'O'],
+        ['B', 'R'],
+      ];
+
+      // Convert 54 stickers into { cp, co, ep, eo } OR return { error: string }
+      function validateAndParseFacelets(facelets) {
+        // 1. Check for empty stickers
+        const emptyCount = facelets.filter((c) => !c).length;
+        if (emptyCount > 0) {
+          return {
+            error: `Masih ada ${emptyCount} kotak yang belum diisi warnanya. Silakan lengkapi semua 6 sisi terlebih dahulu.`,
+          };
+        }
+
+        // 2. Check color counts (each color must appear 9 times)
+        const counts = { W: 0, Y: 0, G: 0, B: 0, R: 0, O: 0 };
+        for (const c of facelets) {
+          if (counts[c] !== undefined) counts[c]++;
+        }
+        const wrongCounts = [];
+        for (const code of COLOR_ORDER) {
+          if (counts[code] !== 9) {
+            wrongCounts.push(`${COLORS[code].name}: ${counts[code]}/9`);
+          }
+        }
+        if (wrongCounts.length > 0) {
+          return {
+            error: `Jumlah warna belum seimbang (setiap warna harus berjumlah 9 kotak). Cek kembali: ${wrongCounts.join(', ')}.`,
+          };
+        }
+
+        // 3. Parse 8 corners
+        const cp = new Array(8);
+        const co = new Array(8);
+        const seenCorners = new Set();
+
+        for (let i = 0; i < 8; i++) {
+          const [f0, f1, f2] = CORNER_FACELETS[i];
+          const cols = [facelets[f0], facelets[f1], facelets[f2]];
+
+          // Orientation is the index where W or Y sits
+          let ori = -1;
+          for (let k = 0; k < 3; k++) {
+            if (cols[k] === 'W' || cols[k] === 'Y') {
+              if (ori !== -1) {
+                return {
+                  error: 'Terdapat kotak sudut yang memiliki warna Putih dan Kuning sekaligus. Periksa kembali input warna Anda.',
+                };
+              }
+              ori = k;
+            }
+          }
+          if (ori === -1) {
+            return {
+              error: 'Terdapat kotak sudut yang tidak memiliki warna Putih maupun Kuning. Periksa kembali input warna Anda.',
+            };
+          }
+
+          // Match normalized cyclic colors against CORNER_COLORS
+          const cNorm = [cols[ori], cols[(ori + 1) % 3], cols[(ori + 2) % 3]];
+          let matchedIdx = -1;
+          for (let j = 0; j < 8; j++) {
+            const ref = CORNER_COLORS[j];
+            if (ref[0] === cNorm[0] && ref[1] === cNorm[1] && ref[2] === cNorm[2]) {
+              matchedIdx = j;
+              break;
+            }
+          }
+          if (matchedIdx === -1) {
+            return {
+              error: `Kombinasi warna sudut (${cols.map((c) => COLORS[c].name).join('-')}) tidak valid pada Rubik standar.`,
+            };
+          }
+          if (seenCorners.has(matchedIdx)) {
+            return {
+              error: `Ada keping sudut (${cols.map((c) => COLORS[c].name).join('-')}) yang terinput lebih dari satu kali.`,
+            };
+          }
+          seenCorners.add(matchedIdx);
+          cp[i] = matchedIdx;
+          co[i] = ori;
+        }
+
+        // 4. Parse 12 edges
+        const ep = new Array(12);
+        const eo = new Array(12);
+        const seenEdges = new Set();
+
+        for (let i = 0; i < 12; i++) {
+          const [f0, f1] = EDGE_FACELETS[i];
+          const cols = [facelets[f0], facelets[f1]];
+          let matchedIdx = -1;
+          let ori = 0;
+
+          for (let j = 0; j < 12; j++) {
+            const ref = EDGE_COLORS[j];
+            if (ref[0] === cols[0] && ref[1] === cols[1]) {
+              matchedIdx = j;
+              ori = 0;
+              break;
+            }
+            if (ref[0] === cols[1] && ref[1] === cols[0]) {
+              matchedIdx = j;
+              ori = 1;
+              break;
+            }
+          }
+          if (matchedIdx === -1) {
+            return {
+              error: `Kombinasi warna bagian tepi (${cols.map((c) => COLORS[c].name).join('-')}) tidak valid pada Rubik standar.`,
+            };
+          }
+          if (seenEdges.has(matchedIdx)) {
+            return {
+              error: `Ada bagian tepi (${cols.map((c) => COLORS[c].name).join('-')}) yang terinput lebih dari satu kali.`,
+            };
+          }
+          seenEdges.add(matchedIdx);
+          ep[i] = matchedIdx;
+          eo[i] = ori;
+        }
+
+        // 5. Check Corner Twist Parity (sum of co % 3 === 0)
+        const twistSum = co.reduce((a, b) => a + b, 0);
+        if (twistSum % 3 !== 0) {
+          return {
+            error: 'Salah satu sudut (corner) Rubik terpelintir secara fisik, atau ada warna sudut yang tertukar.',
+          };
+        }
+
+        // 6. Check Edge Flip Parity (sum of eo % 2 === 0)
+        const flipSum = eo.reduce((a, b) => a + b, 0);
+        if (flipSum % 2 !== 0) {
+          return {
+            error: 'Salah satu bagian tepi (edge) Rubik terbalik secara fisik, atau ada warna tepi yang tertukar.',
+          };
+        }
+
+        // 7. Check Permutation Parity (corner parity === edge parity)
+        let cornerInv = 0;
+        for (let i = 0; i < 8; i++) {
+          for (let j = i + 1; j < 8; j++) {
+            if (cp[i] > cp[j]) cornerInv++;
+          }
+        }
+        let edgeInv = 0;
+        for (let i = 0; i < 12; i++) {
+          for (let j = i + 1; j < 12; j++) {
+            if (ep[i] > ep[j]) edgeInv++;
+          }
+        }
+        if (cornerInv % 2 !== edgeInv % 2) {
+          return {
+            error: 'Posisi dua keping tertukar (kesalahan paritas). Periksa kembali warna yang Anda masukkan.',
+          };
+        }
+
+        return { state: { cp, co, ep, eo } };
+      }
+
+      /* =========================================================================
+       * 3. THISTLETHWAITE 4-PHASE RUBIK SOLVER ENGINE (PURE JS, < 25ms)
+       * ========================================================================= */
+      const MOVE_NAMES = [
+        'U', 'U2', "U'",
+        'D', 'D2', "D'",
+        'L', 'L2', "L'",
+        'R', 'R2', "R'",
+        'F', 'F2', "F'",
+        'B', 'B2', "B'",
+      ];
+
+      // Build cubie transformations for all 18 moves directly from facelet definitions
+      const MOVES = [];
+      (function initMoves() {
+        const baseFaces = ['U', 'D', 'L', 'R', 'F', 'B'];
+        for (const face of baseFaces) {
+          const q1 = validateAndParseFacelets(applyFaceTurnToFacelets(SOLVED_FACELETS, face)).state;
+          const q2 = multiplyCubie(q1, q1);
+          const q3 = multiplyCubie(q2, q1);
+          MOVES.push(q1, q2, q3);
+        }
+      })();
+
+      function multiplyCubie(a, b) {
+        const cp = new Array(8);
+        const co = new Array(8);
+        for (let i = 0; i < 8; i++) {
+          cp[i] = a.cp[b.cp[i]];
+          co[i] = (a.co[b.cp[i]] + b.co[i]) % 3;
+        }
+        const ep = new Array(12);
+        const eo = new Array(12);
+        for (let i = 0; i < 12; i++) {
+          ep[i] = a.ep[b.ep[i]];
+          eo[i] = (a.eo[b.ep[i]] + b.eo[i]) % 2;
+        }
+        return { cp, co, ep, eo };
+      }
+
+      const SOLVED_CUBIE = {
+        cp: [0, 1, 2, 3, 4, 5, 6, 7],
+        co: [0, 0, 0, 0, 0, 0, 0, 0],
+        ep: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        eo: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      };
+
+      // Combinatorial ranking helpers
+      const FACT = [1, 1, 2, 6, 24, 120, 720, 5040, 40320];
+      const COMB = Array.from({ length: 13 }, () => Array(13).fill(0));
+      for (let n = 0; n <= 12; n++) {
+        COMB[n][0] = 1;
+        for (let k = 1; k <= n; k++) {
+          COMB[n][k] = COMB[n - 1][k - 1] + COMB[n - 1][k];
+        }
+      }
+
+      function permToIndex(arr, len) {
+        let idx = 0;
+        for (let i = 0; i < len; i++) {
+          let smaller = 0;
+          for (let j = i + 1; j < len; j++) {
+            if (arr[j] < arr[i]) smaller++;
+          }
+          idx += smaller * FACT[len - 1 - i];
+        }
+        return idx;
+      }
+
+      // Coordinate functions for Phases 0..3
+      function getPhase0Id(s) {
+        let id = 0;
+        for (let i = 0; i < 11; i++) id = (id << 1) | s.eo[i];
+        return id; // 0..2047
+      }
+
+      function getPhase1CoId(s) {
+        let id = 0;
+        for (let i = 0; i < 7; i++) id = id * 3 + s.co[i];
+        return id; // 0..2186
+      }
+
+      function getPhase1EsliceId(s) {
+        // Rank positions of E-slice edges {8,9,10,11} inside 0..11
+        let id = 0;
+        let k = 4;
+        for (let i = 11; i >= 0; i--) {
+          if (s.ep[i] >= 8) {
+            id += COMB[i][k];
+            k--;
+          }
+        }
+        return id; // 0..494 (solved is 494: positions 8,9,10,11)
+      }
+
+      function getPhase2CpId(s) {
+        return permToIndex(s.cp, 8); // 0..40319
+      }
+
+      function getPhase2EpId(s) {
+        // Rank positions of M-slice edges {1,3,5,7} inside U/D slots 0..7
+        let id = 0;
+        let k = 4;
+        for (let i = 7; i >= 0; i--) {
+          const e = s.ep[i];
+          if (e === 1 || e === 3 || e === 5 || e === 7) {
+            id += COMB[i][k];
+            k--;
+          }
+        }
+        return id; // 0..69
+      }
+
+      function getPhase3EpId(s) {
+        // In G3: {0,2,4,6} are in slots {0,2,4,6}; {1,3,5,7} in {1,3,5,7}; {8,9,10,11} in {8,9,10,11}
+        const sSlice = [s.ep[0] >> 1, s.ep[2] >> 1, s.ep[4] >> 1, s.ep[6] >> 1];
+        const mSlice = [s.ep[1] >> 1, s.ep[3] >> 1, s.ep[5] >> 1, s.ep[7] >> 1];
+        const eSlice = [s.ep[8] - 8, s.ep[9] - 8, s.ep[10] - 8, s.ep[11] - 8];
+        return (permToIndex(sSlice, 4) * 24 + permToIndex(mSlice, 4)) * 24 + permToIndex(eSlice, 4); // 0..13823
+      }
+
+      // Allowed move indices per phase
+      const PHASE_MOVES = [
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], // Phase 0: all 18
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 16],                 // Phase 1: <U,D,L,R,F2,B2>
+        [0, 1, 2, 3, 4, 5, 7, 10, 13, 16],                             // Phase 2: <U,D,L2,R2,F2,B2>
+        [1, 4, 7, 10, 13, 16],                                         // Phase 3: <U2,D2,L2,R2,F2,B2>
+      ];
+
+      // Pruning tables built once lazily on first solve
+      let TABLES = null;
+
+      function buildPruningTables() {
+        if (TABLES) return TABLES;
+
+        const buildBFS = (size, startStates, allowedMoves, coordFn) => {
+          const dist = new Int8Array(size).fill(-1);
+          const queue = [];
+          for (const st of startStates) {
+            const id = coordFn(st);
+            if (dist[id] === -1) {
+              dist[id] = 0;
+              queue.push(st);
+            }
+          }
+          let head = 0;
+          while (head < queue.length) {
+            const cur = queue[head++];
+            const curDist = dist[coordFn(cur)];
+            for (const m of allowedMoves) {
+              const nxt = multiplyCubie(cur, MOVES[m]);
+              const nid = coordFn(nxt);
+              if (dist[nid] === -1) {
+                dist[nid] = curDist + 1;
+                queue.push(nxt);
+              }
+            }
+          }
+          return dist;
+        };
+
+        // Phase 0 table
+        const dist0 = buildBFS(2048, [SOLVED_CUBIE], PHASE_MOVES[0], getPhase0Id);
+
+        // Phase 1 tables
+        const dist1Co = buildBFS(2187, [SOLVED_CUBIE], PHASE_MOVES[1], getPhase1CoId);
+        const dist1Es = buildBFS(495, [SOLVED_CUBIE], PHASE_MOVES[1], getPhase1EsliceId);
+
+        // Collect all 96 G3 corner states via Phase 3 moves from SOLVED
+        const g3CornerStates = [SOLVED_CUBIE];
+        const seenG3 = new Set([getPhase2CpId(SOLVED_CUBIE)]);
+        let h = 0;
+        while (h < g3CornerStates.length) {
+          const cur = g3CornerStates[h++];
+          for (const m of PHASE_MOVES[3]) {
+            const nxt = multiplyCubie(cur, MOVES[m]);
+            const id = getPhase2CpId(nxt);
+            if (!seenG3.has(id)) {
+              seenG3.add(id);
+              g3CornerStates.push(nxt);
+            }
+          }
+        }
+
+        // Phase 2 tables
+        const dist2Cp = buildBFS(40320, g3CornerStates, PHASE_MOVES[2], getPhase2CpId);
+        const dist2Ep = buildBFS(70, [SOLVED_CUBIE], PHASE_MOVES[2], getPhase2EpId);
+
+        // Phase 3 tables
+        const dist3Cp = buildBFS(40320, [SOLVED_CUBIE], PHASE_MOVES[3], getPhase2CpId);
+        const dist3Ep = buildBFS(13824, [SOLVED_CUBIE], PHASE_MOVES[3], getPhase3EpId);
+
+        TABLES = { dist0, dist1Co, dist1Es, dist2Cp, dist2Ep, dist3Cp, dist3Ep };
+        return TABLES;
+      }
+
+      // Generic IDA* search for each phase
+      function searchPhase(startState, allowedMoves, heuristicFn, maxDepthLimit) {
+        if (heuristicFn(startState) === 0) return [];
+
+        const path = [];
+        function dfs(state, g, bound, lastFace) {
+          const h = heuristicFn(state);
+          const f = g + h;
+          if (f > bound) return f;
+          if (h === 0) return true;
+
+          let minNext = 999;
+          for (const m of allowedMoves) {
+            const face = Math.floor(m / 3);
+            // Prune redundant consecutive moves on same face or opposite commuting faces
+            if (face === lastFace) continue;
+            if ((face === 0 && lastFace === 1) || (face === 2 && lastFace === 3) || (face === 4 && lastFace === 5)) {
+              continue;
+            }
+
+            path.push(m);
+            const res = dfs(multiplyCubie(state, MOVES[m]), g + 1, bound, face);
+            if (res === true) return true;
+            if (res < minNext) minNext = res;
+            path.pop();
+          }
+          return minNext;
+        }
+
+        let bound = heuristicFn(startState);
+        while (bound <= maxDepthLimit) {
+          const res = dfs(startState, 0, bound, -1);
+          if (res === true) return path.slice();
+          bound = res;
+        }
+        return [];
+      }
+
+      // Merge consecutive moves on the same face (e.g., U + U -> U2, R + R' -> nothing)
+      function simplifyMoveIndices(moveIndices) {
+        const stack = [];
+        for (const m of moveIndices) {
+          const face = Math.floor(m / 3);
+          const power = (m % 3) + 1; // 1, 2, or 3
+          if (stack.length > 0 && stack[stack.length - 1].face === face) {
+            const combined = (stack[stack.length - 1].power + power) % 4;
+            if (combined === 0) {
+              stack.pop();
+            } else {
+              stack[stack.length - 1].power = combined;
+            }
+          } else {
+            stack.push({ face, power });
+          }
+        }
+        return stack.map((item) => MOVE_NAMES[item.face * 3 + (item.power - 1)]);
+      }
+
+      function solveCubeState(initialState) {
+        const t = buildPruningTables();
+        let cur = initialState;
+        const allMoveIndices = [];
+
+        // Phase 0
+        const p0 = searchPhase(cur, PHASE_MOVES[0], (s) => t.dist0[getPhase0Id(s)], 8);
+        for (const m of p0) { cur = multiplyCubie(cur, MOVES[m]); allMoveIndices.push(m); }
+
+        // Phase 1
+        const p1 = searchPhase(
+          cur,
+          PHASE_MOVES[1],
+          (s) => Math.max(t.dist1Co[getPhase1CoId(s)], t.dist1Es[getPhase1EsliceId(s)]),
+          12
+        );
+        for (const m of p1) { cur = multiplyCubie(cur, MOVES[m]); allMoveIndices.push(m); }
+
+        // Phase 2
+        const p2 = searchPhase(
+          cur,
+          PHASE_MOVES[2],
+          (s) => Math.max(t.dist2Cp[getPhase2CpId(s)], t.dist2Ep[getPhase2EpId(s)]),
+          15
+        );
+        for (const m of p2) { cur = multiplyCubie(cur, MOVES[m]); allMoveIndices.push(m); }
+
+        // Phase 3
+        const p3 = searchPhase(
+          cur,
+          PHASE_MOVES[3],
+          (s) => Math.max(t.dist3Cp[getPhase2CpId(s)], t.dist3Ep[getPhase3EpId(s)]),
+          16
+        );
+        for (const m of p3) { cur = multiplyCubie(cur, MOVES[m]); allMoveIndices.push(m); }
+
+        return simplifyMoveIndices(allMoveIndices);
+      }
+
+      /* =========================================================================
+       * 4. HUMAN-READABLE INDONESIAN MOVE TRANSLATOR
+       * ========================================================================= */
+      const FACE_INDO_META = {
+        U: { label: 'ATAS (Putih)',    color: 'W' },
+        D: { label: 'BAWAH (Kuning)',  color: 'Y' },
+        F: { label: 'DEPAN (Hijau)',   color: 'G' },
+        B: { label: 'BELAKANG (Biru)', color: 'B' },
+        R: { label: 'KANAN (Merah)',   color: 'R' },
+        L: { label: 'KIRI (Oranye)',   color: 'O' },
+      };
+
+      function describeMoveIndonesian(moveStr) {
+        const face = moveStr[0];
+        const suffix = moveStr.slice(1);
+        const meta = FACE_INDO_META[face];
+
+        if (suffix === '2') {
+          return {
+            faceTag: `Sisi ${meta.label}`,
+            dirTag: 'Putar 180° (2 Kali)',
+            text: `Putar sisi ${meta.label} sebanyak 2 kali (180°).`,
+          };
+        }
+        if (suffix === "'") {
+          return {
+            faceTag: `Sisi ${meta.label}`,
+            dirTag: 'Berlawanan Jarum Jam (90°)',
+            text: `Putar sisi ${meta.label} berlawanan arah jarum jam (90°).`,
+          };
+        }
+        return {
+          faceTag: `Sisi ${meta.label}`,
+          dirTag: 'Searah Jarum Jam (90°)',
+          text: `Putar sisi ${meta.label} searah jarum jam (90°).`,
+        };
+      }
+
+      /* =========================================================================
+       * 5. INTERACTIVE 3D CANVAS RUBIK RENDERER (INPUT & SOLUTION)
+       * ========================================================================= */
+      const inputCanvas = document.getElementById('input-3d-canvas');
+      const inputCtx = inputCanvas.getContext('2d');
+      const canvas = document.getElementById('cube-3d-canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Camera state for Input 3D Box
+      let inputYaw = -0.62;
+      let inputPitch = 0.48;
+      let inputCamAnimId = null;
+      let lastRenderedInputQuads = []; // Stores projected sticker polygons for tap hit-testing
+
+      // Camera state for Solution 3D Box
+      let camYaw = -0.62;   // Shows Front (G) & Right (R)
+      let camPitch = 0.48;  // Shows Top (W)
+      let isDragging = false;
+      let lastPointerX = 0;
+      let lastPointerY = 0;
+
+      // Active slice animation state
+      let animState = null; // { face: 'R', targetAngle: -Math.PI/2, currentAngle: 0 }
+
+      // Map 3D cubie (x, y, z) in {-1, 0, 1} and face normal to 54-sticker index
+      // Coordinate system: +X = Right, -X = Left, +Y = Up, -Y = Down, +Z = Front, -Z = Back
+      function getStickerIndexForCubieFace(x, y, z, dir) {
+        // Row (0..2 top-to-bottom) and Col (0..2 left-to-right) when viewing each face directly
+        if (dir === 'U' && y === 1) {
+          const row = z + 1;     // z=-1 (back) -> row 0; z=+1 (front) -> row 2
+          const col = x + 1;     // x=-1 (left) -> col 0; x=+1 (right) -> col 2
+          return 0 + row * 3 + col;
+        }
+        if (dir === 'D' && y === -1) {
+          const row = 1 - z;     // z=+1 (front) -> row 0; z=-1 (back) -> row 2
+          const col = x + 1;
+          return 27 + row * 3 + col;
+        }
+        if (dir === 'F' && z === 1) {
+          const row = 1 - y;     // y=+1 (up) -> row 0; y=-1 (down) -> row 2
+          const col = x + 1;
+          return 18 + row * 3 + col;
+        }
+        if (dir === 'B' && z === -1) {
+          const row = 1 - y;
+          const col = 1 - x;     // Looking at B: +X (right) is on the left (col 0)
+          return 45 + row * 3 + col;
+        }
+        if (dir === 'R' && x === 1) {
+          const row = 1 - y;
+          const col = 1 - z;     // Looking at R: +Z (front) is on the left (col 0)
+          return 9 + row * 3 + col;
+        }
+        if (dir === 'L' && x === -1) {
+          const row = 1 - y;
+          const col = z + 1;     // Looking at L: -Z (back) is on the left (col 0)
+          return 36 + row * 3 + col;
+        }
+        return -1;
+      }
+
+      function rotateVec3(v, rx, ry, rz) {
+        let [x, y, z] = v;
+        if (rx !== 0) {
+          const c = Math.cos(rx), s = Math.sin(rx);
+          [y, z] = [y * c - z * s, y * s + z * c];
+        }
+        if (ry !== 0) {
+          const c = Math.cos(ry), s = Math.sin(ry);
+          [x, z] = [x * c + z * s, -x * s + z * c];
+        }
+        if (rz !== 0) {
+          const c = Math.cos(rz), s = Math.sin(rz);
+          [x, y] = [x * c - y * s, x * s + y * c];
+        }
+        return [x, y, z];
+      }
+
+      function cubieInAnimatingLayer(x, y, z, face) {
+        if (face === 'U') return y === 1;
+        if (face === 'D') return y === -1;
+        if (face === 'R') return x === 1;
+        if (face === 'L') return x === -1;
+        if (face === 'F') return z === 1;
+        if (face === 'B') return z === -1;
+        return false;
+      }
+
+      function getLayerRotationVec(face, angle) {
+        // Right-hand rule around +X, +Y, +Z:
+        // Clockwise looking at +X (R) is negative rotation around +X
+        if (face === 'R') return [-angle, 0, 0];
+        if (face === 'L') return [angle, 0, 0];
+        if (face === 'U') return [0, -angle, 0];
+        if (face === 'D') return [0, angle, 0];
+        if (face === 'F') return [0, 0, -angle];
+        if (face === 'B') return [0, 0, angle];
+        return [0, 0, 0];
+      }
+
+      // Generic 3D Rubik Renderer used by both the 3D Input Box and 3D Solution Player
+      function renderCubeOnCanvas(targetCanvas, targetCtx, facelets, yaw, pitch, options = {}) {
+        if (!targetCanvas || !targetCtx) return [];
+
+        const {
+          scaleFactor = 0.145,
+          activeAnim = null,
+          showCenterDots = false,
+        } = options;
+
+        // Responsive HiDPI canvas sizing
+        const rect = targetCanvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return [];
+        const dpr = window.devicePixelRatio || 1;
+        if (targetCanvas.width !== Math.round(rect.width * dpr) || targetCanvas.height !== Math.round(rect.height * dpr)) {
+          targetCanvas.width = Math.round(rect.width * dpr);
+          targetCanvas.height = Math.round(rect.height * dpr);
+        }
+        targetCtx.save();
+        targetCtx.scale(dpr, dpr);
+
+        const w = rect.width;
+        const h = rect.height;
+        targetCtx.clearRect(0, 0, w, h);
+
+        const cx = w / 2;
+        const cy = h / 2 + 4;
+        const scale = Math.min(w, h) * scaleFactor;
+        const cameraDist = 11;
+
+        const project = (pt) => {
+          const p1 = rotateVec3(pt, 0, yaw, 0);
+          const p2 = rotateVec3(p1, pitch, 0, 0);
+          const factor = cameraDist / (cameraDist - p2[2]);
+          return {
+            x: cx + p2[0] * scale * factor,
+            y: cy - p2[1] * scale * factor,
+            z: p2[2],
+          };
+        };
+
+        const quads = [];
+        const half = 0.485;
+        const stickerHalf = 0.415;
+
+        const faceDefs = [
+          {
+            dir: 'U',
+            normal: [0, 1, 0],
+            corners: [[-half, half, -half], [half, half, -half], [half, half, half], [-half, half, half]],
+            sticker: [[-stickerHalf, half + 0.004, -stickerHalf], [stickerHalf, half + 0.004, -stickerHalf], [stickerHalf, half + 0.004, stickerHalf], [-stickerHalf, half + 0.004, stickerHalf]],
+          },
+          {
+            dir: 'D',
+            normal: [0, -1, 0],
+            corners: [[-half, -half, half], [half, -half, half], [half, -half, -half], [-half, -half, -half]],
+            sticker: [[-stickerHalf, -half - 0.004, stickerHalf], [stickerHalf, -half - 0.004, stickerHalf], [stickerHalf, -half - 0.004, -stickerHalf], [-stickerHalf, -half - 0.004, -stickerHalf]],
+          },
+          {
+            dir: 'F',
+            normal: [0, 0, 1],
+            corners: [[-half, half, half], [half, half, half], [half, -half, half], [-half, -half, half]],
+            sticker: [[-stickerHalf, stickerHalf, half + 0.004], [stickerHalf, stickerHalf, half + 0.004], [stickerHalf, -stickerHalf, half + 0.004], [-stickerHalf, -stickerHalf, half + 0.004]],
+          },
+          {
+            dir: 'B',
+            normal: [0, 0, -1],
+            corners: [[half, half, -half], [-half, half, -half], [-half, -half, -half], [half, -half, -half]],
+            sticker: [[stickerHalf, stickerHalf, -half - 0.004], [-stickerHalf, stickerHalf, -half - 0.004], [-stickerHalf, -stickerHalf, -half - 0.004], [stickerHalf, -stickerHalf, -half - 0.004]],
+          },
+          {
+            dir: 'R',
+            normal: [1, 0, 0],
+            corners: [[half, half, half], [half, half, -half], [half, -half, -half], [half, -half, half]],
+            sticker: [[half + 0.004, stickerHalf, stickerHalf], [half + 0.004, stickerHalf, -stickerHalf], [half + 0.004, -stickerHalf, -stickerHalf], [half + 0.004, -stickerHalf, stickerHalf]],
+          },
+          {
+            dir: 'L',
+            normal: [-1, 0, 0],
+            corners: [[-half, half, -half], [-half, half, half], [-half, -half, half], [-half, -half, -half]],
+            sticker: [[-half - 0.004, stickerHalf, -stickerHalf], [-half - 0.004, stickerHalf, stickerHalf], [-half - 0.004, -stickerHalf, stickerHalf], [-half - 0.004, -stickerHalf, -stickerHalf]],
+          },
+        ];
+
+        for (let x = -1; x <= 1; x++) {
+          for (let y = -1; y <= 1; y++) {
+            for (let z = -1; z <= 1; z++) {
+              if (x === 0 && y === 0 && z === 0) continue;
+
+              const isAnimating = activeAnim && cubieInAnimatingLayer(x, y, z, activeAnim.face);
+              const [rx, ry, rz] = isAnimating
+                ? getLayerRotationVec(activeAnim.face, activeAnim.currentAngle)
+                : [0, 0, 0];
+
+              for (const fd of faceDefs) {
+                const stickerIdx = getStickerIndexForCubieFace(x, y, z, fd.dir);
+                const isExternalFace = stickerIdx !== -1;
+                const stickerColorCode = isExternalFace ? facelets[stickerIdx] : null;
+                const fillHex = stickerColorCode ? COLORS[stickerColorCode].hex : '#cbd5e1';
+
+                // Transform face normal to camera space for back-face culling
+                const nRot = rotateVec3(fd.normal, rx, ry, rz);
+                const nCam1 = rotateVec3(nRot, 0, yaw, 0);
+                const nCam2 = rotateVec3(nCam1, pitch, 0, 0);
+
+                // Transform center of quad to camera space to test view vector
+                const cLocal = [x + fd.normal[0] * half, y + fd.normal[1] * half, z + fd.normal[2] * half];
+                const cRot = rotateVec3(cLocal, rx, ry, rz);
+                const cCam1 = rotateVec3(cRot, 0, yaw, 0);
+                const cCam2 = rotateVec3(cCam1, pitch, 0, 0);
+
+                const toCam = [-cCam2[0], -cCam2[1], cameraDist - cCam2[2]];
+                const dot = nCam2[0] * toCam[0] + nCam2[1] * toCam[1] + nCam2[2] * toCam[2];
+                if (dot <= 0) continue; // Back-face culled
+
+                const bodyPts = fd.corners.map((c) => {
+                  const pt = [x + c[0], y + c[1], z + c[2]];
+                  return project(rotateVec3(pt, rx, ry, rz));
+                });
+
+                const stickerPts = isExternalFace
+                  ? fd.sticker.map((c) => {
+                      const pt = [x + c[0], y + c[1], z + c[2]];
+                      return project(rotateVec3(pt, rx, ry, rz));
+                    })
+                  : null;
+
+                const avgZ = bodyPts.reduce((acc, p) => acc + p.z, 0) / 4;
+                quads.push({
+                  avgZ,
+                  bodyPts,
+                  stickerPts,
+                  fillHex,
+                  stickerColorCode,
+                  stickerIdx,
+                  isExternalFace,
+                });
+              }
+            }
+          }
+        }
+
+        // Painter's sort back-to-front
+        quads.sort((a, b) => a.avgZ - b.avgZ);
+
+        for (const q of quads) {
+          // Draw dark plastic cubie body
+          targetCtx.beginPath();
+          targetCtx.moveTo(q.bodyPts[0].x, q.bodyPts[0].y);
+          for (let i = 1; i < 4; i++) targetCtx.lineTo(q.bodyPts[i].x, q.bodyPts[i].y);
+          targetCtx.closePath();
+          targetCtx.fillStyle = '#0f172a';
+          targetCtx.fill();
+          targetCtx.lineWidth = 1.2;
+          targetCtx.strokeStyle = '#020617';
+          targetCtx.stroke();
+
+          // Draw external sticker (colored or unfilled light-slate slot)
+          if (q.stickerPts) {
+            targetCtx.beginPath();
+            targetCtx.moveTo(q.stickerPts[0].x, q.stickerPts[0].y);
+            for (let i = 1; i < 4; i++) targetCtx.lineTo(q.stickerPts[i].x, q.stickerPts[i].y);
+            targetCtx.closePath();
+            targetCtx.fillStyle = q.fillHex;
+            targetCtx.fill();
+            targetCtx.lineWidth = 1.1;
+            targetCtx.strokeStyle =
+              !q.stickerColorCode
+                ? '#94a3b8'
+                : q.stickerColorCode === 'W'
+                ? '#94a3b8'
+                : 'rgba(15,23,42,0.3)';
+            targetCtx.stroke();
+
+            // Draw subtle center lock dot on the 6 center stickers during input mode
+            if (showCenterDots && q.stickerIdx % 9 === 4) {
+              const centerX = q.stickerPts.reduce((s, p) => s + p.x, 0) / 4;
+              const centerY = q.stickerPts.reduce((s, p) => s + p.y, 0) / 4;
+              targetCtx.beginPath();
+              targetCtx.arc(centerX, centerY, Math.max(3, scale * 0.055), 0, Math.PI * 2);
+              targetCtx.fillStyle = q.stickerColorCode === 'W' || q.stickerColorCode === 'Y'
+                ? 'rgba(15, 23, 42, 0.35)'
+                : 'rgba(255, 255, 255, 0.75)';
+              targetCtx.fill();
+            }
+          }
+        }
+
+        targetCtx.restore();
+        return quads;
+      }
+
+      function renderInput3DCube() {
+        lastRenderedInputQuads = renderCubeOnCanvas(
+          inputCanvas,
+          inputCtx,
+          userFacelets,
+          inputYaw,
+          inputPitch,
+          { scaleFactor: 0.155, showCenterDots: true }
+        );
+      }
+
+      function render3DCube(facelets) {
+        renderCubeOnCanvas(canvas, ctx, facelets, camYaw, camPitch, {
+          scaleFactor: 0.145,
+          activeAnim: animState,
+          showCenterDots: false,
+        });
+      }
+
+      // Point-in-polygon helper for tapping stickers directly on the 3D cube
+      function isPointInQuad(px, py, pts) {
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+          const xi = pts[i].x, yi = pts[i].y;
+          const xj = pts[j].x, yj = pts[j].y;
+          const intersect = ((yi > py) !== (yj > py)) &&
+            (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-9) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      }
+
+      // Smoothly orbit Input 3D Cube to focus on a specific face
+      function animateInputCameraTo(targetYaw, targetPitch) {
+        if (inputCamAnimId) {
+          cancelAnimationFrame(inputCamAnimId);
+          inputCamAnimId = null;
+        }
+        const startYaw = inputYaw;
+        const startPitch = inputPitch;
+        // Shortest angular path for yaw
+        let deltaYaw = ((targetYaw - startYaw + Math.PI) % (Math.PI * 2)) - Math.PI;
+        if (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
+        const deltaPitch = targetPitch - startPitch;
+        const duration = 320;
+        const startTime = performance.now();
+
+        function step(now) {
+          const t = Math.min(1, (now - startTime) / duration);
+          const eased = 1 - Math.pow(1 - t, 3);
+          inputYaw = startYaw + deltaYaw * eased;
+          inputPitch = startPitch + deltaPitch * eased;
+          renderInput3DCube();
+          if (t < 1) {
+            inputCamAnimId = requestAnimationFrame(step);
+          } else {
+            inputCamAnimId = null;
+          }
+        }
+        inputCamAnimId = requestAnimationFrame(step);
+      }
+
+      // Pointer drag & tap handlers for 3D Input Canvas
+      let inputPointerDown = false;
+      let inputMoved = false;
+      let inputDownX = 0;
+      let inputDownY = 0;
+      let inputLastX = 0;
+      let inputLastY = 0;
+
+      inputCanvas.addEventListener('pointerdown', (e) => {
+        if (inputCamAnimId) {
+          cancelAnimationFrame(inputCamAnimId);
+          inputCamAnimId = null;
+        }
+        inputPointerDown = true;
+        inputMoved = false;
+        inputDownX = inputLastX = e.clientX;
+        inputDownY = inputLastY = e.clientY;
+        inputCanvas.setPointerCapture(e.pointerId);
+      });
+
+      inputCanvas.addEventListener('pointermove', (e) => {
+        if (!inputPointerDown) return;
+        const dx = e.clientX - inputLastX;
+        const dy = e.clientY - inputLastY;
+        if (Math.hypot(e.clientX - inputDownX, e.clientY - inputDownY) > 6) {
+          inputMoved = true;
+        }
+        inputLastX = e.clientX;
+        inputLastY = e.clientY;
+
+        inputYaw += dx * 0.012;
+        inputPitch = Math.max(-1.35, Math.min(1.35, inputPitch + dy * 0.012));
+        renderInput3DCube();
+      });
+
+      inputCanvas.addEventListener('pointerup', (e) => {
+        if (!inputPointerDown) return;
+        inputPointerDown = false;
+
+        // If user tapped (did not drag), detect which 3D sticker was clicked
+        if (!inputMoved) {
+          const rect = inputCanvas.getBoundingClientRect();
+          const tapX = e.clientX - rect.left;
+          const tapY = e.clientY - rect.top;
+
+          // Iterate front-to-back (reverse of painter's sort)
+          for (let i = lastRenderedInputQuads.length - 1; i >= 0; i--) {
+            const q = lastRenderedInputQuads[i];
+            if (!q.isExternalFace) continue;
+            if (isPointInQuad(tapX, tapY, q.bodyPts)) {
+              // Ignore center stickers (index % 9 === 4) so centers stay locked
+              if (q.stickerIdx % 9 !== 4) {
+                userFacelets[q.stickerIdx] = selectedColor;
+                hideValidationMessage();
+                renderAllInputViews();
+              }
+              break;
+            }
+          }
+        }
+      });
+
+      inputCanvas.addEventListener('pointercancel', () => {
+        inputPointerDown = false;
+      });
+
+      // Pointer drag handlers for 3D Solution camera orbit
+      canvas.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        canvas.setPointerCapture(e.pointerId);
+      });
+
+      canvas.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - lastPointerX;
+        const dy = e.clientY - lastPointerY;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+
+        camYaw += dx * 0.012;
+        camPitch = Math.max(-1.25, Math.min(1.25, camPitch + dy * 0.012));
+        render3DCube(getCurrentPlaybackFacelets());
+      });
+
+      canvas.addEventListener('pointerup', () => {
+        isDragging = false;
+      });
+      canvas.addEventListener('pointercancel', () => {
+        isDragging = false;
+      });
+
+      window.addEventListener('resize', () => {
+        if (!document.getElementById('section-input').classList.contains('hidden')) {
+          renderInput3DCube();
+        }
+        if (!document.getElementById('section-solution').classList.contains('hidden')) {
+          render3DCube(getCurrentPlaybackFacelets());
+        }
+      });
+
+      /* =========================================================================
+       * 6. APPLICATION STATE & UI CONTROLLERS
+       * ========================================================================= */
+      let userFacelets = Array(54).fill(null);
+      let selectedColor = 'W';
+      let currentFaceIndex = 0; // Index into FACES (0..5)
+
+      // Preset camera angles to quickly focus on any of the 6 faces in 3D
+      const FACE_CAMERA_ANGLES = {
+        U: { yaw: -0.35, pitch: 0.92 },
+        F: { yaw: -0.35, pitch: 0.28 },
+        R: { yaw: -1.25, pitch: 0.28 },
+        B: { yaw: 2.75,  pitch: 0.28 },
+        L: { yaw: 1.25,  pitch: 0.28 },
+        D: { yaw: -0.35, pitch: -0.92 },
+      };
+
+      // Playback state
+      let solutionMoves = [];
+      let stateHistory = []; // Array of 54-sticker arrays from step 0 to N
+      let currentStep = 0;
+      let isAutoPlaying = false;
+      let autoPlaySpeed = 850;
+      let autoPlayTimer = null;
+      let animFrameId = null;
+
+      function initBlankFacelets() {
+        userFacelets = Array(54).fill(null);
+        // Lock the 6 centers to standard colors
+        for (const f of FACES) {
+          userFacelets[f.offset + 4] = f.centerColor;
+        }
+      }
+
+      function getCurrentPlaybackFacelets() {
+        return stateHistory[currentStep] || userFacelets;
+      }
+
+      function showValidationMessage(msg, type = 'error') {
+        const box = document.getElementById('validation-box');
+        const text = document.getElementById('validation-text');
+        box.classList.remove(
+          'hidden',
+          'bg-red-50', 'border-red-200', 'text-red-800',
+          'bg-emerald-50', 'border-emerald-200', 'text-emerald-800',
+          'bg-indigo-50', 'border-indigo-200', 'text-indigo-800'
+        );
+
+        if (type === 'success') {
+          box.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-800');
+        } else if (type === 'info') {
+          box.classList.add('bg-indigo-50', 'border-indigo-200', 'text-indigo-800');
+        } else {
+          box.classList.add('bg-red-50', 'border-red-200', 'text-red-800');
+        }
+        text.textContent = msg;
+      }
+
+      function hideValidationMessage() {
+        document.getElementById('validation-box').classList.add('hidden');
+      }
+
+      function renderColorPalette() {
+        const container = document.getElementById('color-palette');
+        container.innerHTML = '';
+
+        const counts = { W: 0, Y: 0, G: 0, B: 0, R: 0, O: 0 };
+        let totalFilled = 0;
+        for (const c of userFacelets) {
+          if (c) {
+            counts[c]++;
+            totalFilled++;
+          }
+        }
+
+        document.getElementById('total-filled-counter').textContent = `Terisi: ${totalFilled} / 54 kotak`;
+
+        for (const code of COLOR_ORDER) {
+          const info = COLORS[code];
+          const count = counts[code];
+          const isSelected = selectedColor === code;
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `p-2.5 rounded-xl border-2 flex items-center justify-between gap-2 transition active:scale-95 ${
+            isSelected
+              ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-600/20 shadow-sm'
+              : 'border-slate-200 bg-white hover:bg-slate-50'
+          }`;
+
+          const badgeClass =
+            count === 9
+              ? 'bg-emerald-100 text-emerald-800'
+              : count > 9
+              ? 'bg-red-100 text-red-700'
+              : 'bg-slate-100 text-slate-600';
+
+          btn.innerHTML = `
+            <div class="flex items-center gap-2 min-w-0">
+              <span
+                class="w-6 h-6 rounded-lg shrink-0 shadow-inner"
+                style="background-color: ${info.hex}; border: 1.5px solid ${info.border};"
+              ></span>
+              <span class="text-xs sm:text-sm font-bold text-slate-800 truncate">${info.name}</span>
+            </div>
+            <span class="text-[11px] font-extrabold px-1.5 py-0.5 rounded-md ${badgeClass}">
+              ${count === 9 ? '9 ✓' : `${count}/9`}
+            </span>
+          `;
+
+          btn.addEventListener('click', () => {
+            selectedColor = code;
+            renderColorPalette();
+          });
+
+          container.appendChild(btn);
+        }
+      }
+
+      function renderFaceTabs() {
+        const container = document.getElementById('face-tabs-container');
+        container.innerHTML = '';
+
+        FACES.forEach((face, idx) => {
+          const slice = userFacelets.slice(face.offset, face.offset + 9);
+          const filled = slice.filter(Boolean).length;
+          const isActive = idx === currentFaceIndex;
+          const cInfo = COLORS[face.centerColor];
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `p-2 rounded-xl border text-left transition flex items-center justify-between gap-1.5 ${
+            isActive
+              ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-sm ring-2 ring-indigo-600/20'
+              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+          }`;
+
+          btn.innerHTML = `
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span
+                class="w-3.5 h-3.5 rounded-sm shrink-0"
+                style="background-color: ${cInfo.hex}; border: 1px solid ${cInfo.border};"
+              ></span>
+              <span class="text-xs font-bold truncate">${face.shortName}</span>
+            </div>
+            <span class="text-[10px] font-extrabold ${filled === 9 ? 'text-emerald-600' : 'text-slate-400'}">
+              ${filled === 9 ? '✓' : `${filled}/9`}
+            </span>
+          `;
+
+          btn.addEventListener('click', () => {
+            currentFaceIndex = idx;
+            const target = FACE_CAMERA_ANGLES[face.id];
+            animateInputCameraTo(target.yaw, target.pitch);
+            renderFaceTabs();
+          });
+
+          container.appendChild(btn);
+        });
+      }
+
+      function renderAllInputViews() {
+        renderFaceTabs();
+        renderInput3DCube();
+        renderColorPalette();
+      }
+
+      /* =========================================================================
+       * 7. SOLUTION PLAYBACK & SMOOTH SLICE ANIMATION
+       * ========================================================================= */
+      function stopAutoPlay() {
+        isAutoPlaying = false;
+        if (autoPlayTimer) {
+          clearTimeout(autoPlayTimer);
+          autoPlayTimer = null;
+        }
+        document.getElementById('play-btn-icon').textContent = '▶';
+        document.getElementById('play-btn-label').textContent = 'Putar';
+      }
+
+      function animateMoveAndGoToStep(targetStep, moveStr, isReverse = false) {
+        if (animFrameId) {
+          cancelAnimationFrame(animFrameId);
+          animFrameId = null;
+        }
+
+        const face = moveStr[0];
+        const suffix = moveStr.slice(1);
+        let angle = suffix === '2' ? Math.PI : suffix === "'" ? -Math.PI / 2 : Math.PI / 2;
+        if (isReverse) angle = -angle;
+
+        const baseFacelets = isReverse ? stateHistory[targetStep + 1] : stateHistory[targetStep - 1];
+        const duration = Math.min(280, autoPlaySpeed * 0.45);
+        const startTime = performance.now();
+
+        animState = { face, currentAngle: 0 };
+
+        function tick(now) {
+          const elapsed = now - startTime;
+          const progress = Math.min(1, elapsed / duration);
+          // Smooth ease-out cubic
+          const eased = 1 - Math.pow(1 - progress, 3);
+          animState.currentAngle = angle * eased;
+          render3DCube(baseFacelets);
+
+          if (progress < 1) {
+            animFrameId = requestAnimationFrame(tick);
+          } else {
+            animState = null;
+            animFrameId = null;
+            currentStep = targetStep;
+            updateSolutionUI();
+          }
+        }
+
+        animFrameId = requestAnimationFrame(tick);
+      }
+
+      function goToStep(step, animate = true) {
+        const clamped = Math.max(0, Math.min(solutionMoves.length, step));
+        if (animate && Math.abs(clamped - currentStep) === 1) {
+          if (clamped > currentStep) {
+            animateMoveAndGoToStep(clamped, solutionMoves[clamped - 1], false);
+          } else {
+            animateMoveAndGoToStep(clamped, solutionMoves[currentStep - 1], true);
+          }
+        } else {
+          animState = null;
+          currentStep = clamped;
+          updateSolutionUI();
+        }
+      }
+
+      function scheduleNextAutoPlayStep() {
+        if (!isAutoPlaying) return;
+        if (currentStep >= solutionMoves.length) {
+          stopAutoPlay();
+          return;
+        }
+        autoPlayTimer = setTimeout(() => {
+          if (!isAutoPlaying) return;
+          goToStep(currentStep + 1, true);
+          scheduleNextAutoPlayStep();
+        }, autoPlaySpeed);
+      }
+
+      function toggleAutoPlay() {
+        if (isAutoPlaying) {
+          stopAutoPlay();
+          return;
+        }
+        if (currentStep >= solutionMoves.length) {
+          currentStep = 0;
+          updateSolutionUI();
+        }
+        isAutoPlaying = true;
+        document.getElementById('play-btn-icon').textContent = '⏸';
+        document.getElementById('play-btn-label').textContent = 'Jeda';
+        scheduleNextAutoPlayStep();
+      }
+
+      function updateSolutionUI() {
+        const total = solutionMoves.length;
+        const pct = total === 0 ? 100 : Math.round((currentStep / total) * 100);
+
+        document.getElementById('step-progress-label').textContent = `Langkah ${currentStep} dari ${total}`;
+        document.getElementById('step-percent-label').textContent = `${pct}%`;
+        document.getElementById('step-progress-bar').style.width = `${pct}%`;
+
+        const badge = document.getElementById('move-notation-badge');
+        const faceTag = document.getElementById('move-face-tag');
+        const dirTag = document.getElementById('move-dir-tag');
+        const instrText = document.getElementById('move-instruction-text');
+        const card = document.getElementById('current-move-card');
+
+        card.classList.remove('bg-emerald-50', 'border-emerald-200', 'bg-indigo-50/80', 'border-indigo-100');
+
+        if (total === 0) {
+          card.classList.add('bg-emerald-50', 'border-emerald-200');
+          badge.textContent = '✓';
+          badge.className = 'w-16 h-16 rounded-2xl bg-emerald-600 text-white font-extrabold text-2xl flex items-center justify-center shrink-0 shadow-sm';
+          faceTag.textContent = 'Sudah Tersusun';
+          dirTag.textContent = 'Selesai';
+          instrText.textContent = 'Rubik Anda sudah tersusun rapi sesuai warna per sisinya!';
+        } else if (currentStep === 0) {
+          card.classList.add('bg-indigo-50/80', 'border-indigo-100');
+          badge.textContent = 'Mulai';
+          badge.className = 'w-16 h-16 rounded-2xl bg-indigo-600 text-white font-extrabold text-base flex items-center justify-center shrink-0 shadow-sm';
+          faceTag.textContent = 'Posisi Awal';
+          dirTag.textContent = `Langkah berikutnya: ${solutionMoves[0]}`;
+          instrText.textContent = 'Pegang Rubik dengan Pusat Putih di ATAS dan Hijau di DEPAN, lalu tekan "Maju" atau "Putar".';
+        } else {
+          const moveStr = solutionMoves[currentStep - 1];
+          const desc = describeMoveIndonesian(moveStr);
+          const isFinal = currentStep === total;
+
+          card.classList.add(isFinal ? 'bg-emerald-50' : 'bg-indigo-50/80', isFinal ? 'border-emerald-200' : 'border-indigo-100');
+          badge.textContent = moveStr;
+          badge.className = `w-16 h-16 rounded-2xl ${isFinal ? 'bg-emerald-600' : 'bg-indigo-600'} text-white font-extrabold text-2xl flex items-center justify-center shrink-0 shadow-sm`;
+          faceTag.textContent = desc.faceTag;
+          dirTag.textContent = desc.dirTag;
+          instrText.textContent = isFinal
+            ? `${desc.text} — Selamat! Rubik Anda telah selesai tersusun!`
+            : desc.text;
+        }
+
+        // Update playback buttons disabled state
+        document.getElementById('btn-step-first').disabled = currentStep === 0;
+        document.getElementById('btn-step-prev').disabled = currentStep === 0;
+        document.getElementById('btn-step-next').disabled = currentStep >= total;
+
+        // Render clickable step pills
+        const pillContainer = document.getElementById('moves-pill-list');
+        pillContainer.innerHTML = '';
+
+        solutionMoves.forEach((m, idx) => {
+          const stepNum = idx + 1;
+          const pill = document.createElement('button');
+          pill.type = 'button';
+          pill.textContent = `${stepNum}. ${m}`;
+
+          if (stepNum === currentStep) {
+            pill.className = 'px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-600/30';
+          } else if (stepNum < currentStep) {
+            pill.className = 'px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition';
+          } else {
+            pill.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+          }
+
+          pill.addEventListener('click', () => {
+            stopAutoPlay();
+            goToStep(stepNum, false);
+          });
+          pillContainer.appendChild(pill);
+        });
+
+        render3DCube(getCurrentPlaybackFacelets());
+      }
+
+      /* =========================================================================
+       * 8. EVENT LISTENERS & INITIALIZATION
+       * ========================================================================= */
+      document.getElementById('btn-flip-input-cube').addEventListener('click', () => {
+        // Flip 180 degrees horizontally and invert pitch to reveal the opposite 3 faces
+        animateInputCameraTo(inputYaw + Math.PI, -inputPitch);
+      });
+
+      document.getElementById('btn-reset-colors').addEventListener('click', () => {
+        stopAutoPlay();
+        initBlankFacelets();
+        currentFaceIndex = 0;
+        inputYaw = -0.62;
+        inputPitch = 0.48;
+        hideValidationMessage();
+        document.getElementById('section-solution').classList.add('hidden');
+        document.getElementById('section-input').classList.remove('hidden');
+        renderAllInputViews();
+      });
+
+      document.getElementById('btn-demo-scramble').addEventListener('click', () => {
+        stopAutoPlay();
+        // Generate a realistic 18-move scramble from SOLVED_FACELETS
+        const sampleMoves = ['R', 'U', "F'", 'D2', 'L', "B'", 'R2', 'U', 'L', "D'", 'F2', "R'", 'B', 'U2', 'F', "L'"];
+        let scrambled = SOLVED_FACELETS.slice();
+        for (const m of sampleMoves) {
+          scrambled = applyNotationToFacelets(scrambled, m);
+        }
+        userFacelets = scrambled;
+        hideValidationMessage();
+        document.getElementById('section-solution').classList.add('hidden');
+        document.getElementById('section-input').classList.remove('hidden');
+        renderAllInputViews();
+        showValidationMessage(
+          'Contoh Rubik teracak berhasil dimuat ke kotak 3D! Putar kubus untuk melihatnya atau langsung tekan "Selesaikan Rubik Sekarang".',
+          'info'
+        );
+      });
+
+      document.getElementById('btn-solve-cube').addEventListener('click', () => {
+        hideValidationMessage();
+        const parsed = validateAndParseFacelets(userFacelets);
+        if (parsed.error) {
+          showValidationMessage(parsed.error, 'error');
+          return;
+        }
+
+        // Compute optimal 4-phase Thistlethwaite solution
+        const moves = solveCubeState(parsed.state);
+        solutionMoves = moves;
+
+        // Precompute facelet states for each step 0..N
+        stateHistory = [userFacelets.slice()];
+        let curFacelets = userFacelets.slice();
+        for (const m of moves) {
+          curFacelets = applyNotationToFacelets(curFacelets, m);
+          stateHistory.push(curFacelets);
+        }
+
+        currentStep = 0;
+        camYaw = -0.62;
+        camPitch = 0.48;
+
+        document.getElementById('solution-summary-title').textContent =
+          moves.length === 0
+            ? 'Rubik Sudah Tersusun!'
+            : `Selesai dalam ${moves.length} Langkah`;
+
+        document.getElementById('section-input').classList.add('hidden');
+        document.getElementById('section-solution').classList.remove('hidden');
+        updateSolutionUI();
+      });
+
+      document.getElementById('btn-back-to-edit').addEventListener('click', () => {
+        stopAutoPlay();
+        document.getElementById('section-solution').classList.add('hidden');
+        document.getElementById('section-input').classList.remove('hidden');
+        renderAllInputViews();
+      });
+
+      document.getElementById('btn-reset-camera').addEventListener('click', () => {
+        camYaw = -0.62;
+        camPitch = 0.48;
+        render3DCube(getCurrentPlaybackFacelets());
+      });
+
+      document.getElementById('btn-step-first').addEventListener('click', () => {
+        stopAutoPlay();
+        goToStep(0, false);
+      });
+
+      document.getElementById('btn-step-prev').addEventListener('click', () => {
+        stopAutoPlay();
+        goToStep(currentStep - 1, true);
+      });
+
+      document.getElementById('btn-step-next').addEventListener('click', () => {
+        stopAutoPlay();
+        goToStep(currentStep + 1, true);
+      });
+
+      document.getElementById('btn-step-play').addEventListener('click', () => {
+        toggleAutoPlay();
+      });
+
+      document.querySelectorAll('.speed-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          autoPlaySpeed = Number(btn.dataset.speed);
+          document.querySelectorAll('.speed-btn').forEach((b) => {
+            b.classList.remove('bg-indigo-600', 'text-white');
+            b.classList.add('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+          });
+          btn.classList.remove('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+          btn.classList.add('bg-indigo-600', 'text-white');
+        });
+      });
+
+      // Boot application
+      initBlankFacelets();
+      renderAllInputViews();
+    })();
+  </script>
+</body>
+</html>
